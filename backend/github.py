@@ -12,7 +12,8 @@ def _headers(token: str | None) -> dict:
     return h
 
 
-async def fetch_repos(username: str, token: str | None = None) -> list[dict]:
+async def fetch_all_repos(username: str, token: str | None = None) -> list[dict]:
+    """Fetch every public repo for a user, paginating through GitHub's 100-per-page limit."""
     repos: list[dict] = []
     page = 1
     async with httpx.AsyncClient(timeout=15) as client:
@@ -36,6 +37,19 @@ async def fetch_repos(username: str, token: str | None = None) -> list[dict]:
             page += 1
 
     return repos
+
+
+async def fetch_repos_page(
+    username: str,
+    page: int,
+    per_page: int,
+    token: str | None = None,
+) -> tuple[list[dict], int]:
+    """Fetch a single page slice of repos. Returns (repos_slice, total_count)."""
+    all_repos = await fetch_all_repos(username, token)
+    total = len(all_repos)
+    start = (page - 1) * per_page
+    return all_repos[start : start + per_page], total
 
 
 async def fetch_readme(owner: str, repo: str, token: str | None = None) -> str | None:

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import RepoCard from "./components/RepoCard";
 import "./App.css";
 
@@ -10,33 +10,38 @@ interface RepoResult {
   has_readme: boolean;
 }
 
+interface AnalyzeResponse {
+  results: RepoResult[];
+  total: number;
+  page: number;
+  per_page: number;
+}
+
+const PER_PAGE = 10;
+
 export default function App() {
   const [username, setUsername] = useState("");
+  const [analyzedUsername, setAnalyzedUsername] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [results, setResults] = useState<RepoResult[] | null>(null);
-  const [analyzedUsername, setAnalyzedUsername] = useState(""); //username that was analyzed
+  const [results, setResults] = useState<RepoResult[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [filterComplexity, setFilterComplexity] = useState<"all" | "basic" | "intermediate" | "advanced" | "na">("all");
 
-  const filteredResults = results?.filter((r) =>
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const filteredResults = results.filter((r) =>
     filterComplexity === "all" || r.level.toLowerCase() === filterComplexity
-  ) ?? [];
+  );
 
-
-  async function handleAnalyze() {
-    const trimmed = username.trim();
-    if (!trimmed) return;
-
-    setAnalyzedUsername(trimmed);
-    setFilterComplexity("all");
+  const fetchPage = useCallback(async (user: string, pageNum: number) => {
     setLoading(true);
-    setError(null);
-    setResults(null);
-
     try {
-      const resp = await fetch(`/analyze?username=${encodeURIComponent(trimmed)}`, { //encode the username to handle special characters
-        method: "POST",
-      });
+      const resp = await fetch(
+        `/analyze?username=${encodeURIComponent(user)}&page=${pageNum}&per_page=${PER_PAGE}`
+      );
 
       if (!resp.ok) {
         const data = await resp.json().catch(() => ({}));
@@ -44,18 +49,53 @@ export default function App() {
         return;
       }
 
-      const data: RepoResult[] = await resp.json();
-      setResults(data);
+      const data: AnalyzeResponse = await resp.json();
+
+      setResults((prev) => (pageNum === 1 ? data.results : [...prev, ...data.results]));
+      setTotal(data.total);
+      setPage(data.page);
+      setHasMore((data.page * data.per_page) < data.total);
     } catch {
       setError("Could not reach the server. Is the backend running?");
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  async function handleAnalyze() {
+    const trimmed = username.trim();
+    if (!trimmed) return;
+
+    setAnalyzedUsername(trimmed);
+    setFilterComplexity("all");
+    setError(null);
+    setResults([]);
+    setTotal(0);
+    setHasMore(false);
+
+    await fetchPage(trimmed, 1);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") handleAnalyze();
   }
+
+  // IntersectionObserver — fires when the sentinel div scrolls into view
+  useEffect(() => {
+    if (!sentinelRef.current || !hasMore || loading) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          fetchPage(analyzedUsername, page + 1);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loading, page, analyzedUsername, fetchPage]);
 
   return (
     <div className="page">
@@ -72,14 +112,14 @@ export default function App() {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={loading}
+          disabled={loading && results.length === 0}
         />
         <button className="button" onClick={handleAnalyze} disabled={loading || !username.trim()}>
-          {loading ? "Analyzing…" : "Analyze"}
+          {loading && results.length === 0 ? "Analyzing…" : "Analyze"}
         </button>
       </div>
 
-      {loading && (
+      {loading && results.length === 0 && (
         <div className="status-text">Fetching repos and analyzing READMEs…</div>
       )}
 
@@ -87,15 +127,15 @@ export default function App() {
         <div className="error-box">{error}</div>
       )}
 
-      {results !== null && results.length === 0 && (
+      {!loading && results.length === 0 && analyzedUsername && !error && (
         <div className="status-text">No public repositories found for <strong>{analyzedUsername}</strong>.</div>
       )}
 
-      {results && results.length > 0 && (
+      {results.length > 0 && (
         <>
           <div className="results-header">
             <p className="result-count">
-              {filteredResults.length} of {results.length} repositor{results.length === 1 ? "y" : "ies"} for <strong>{analyzedUsername}</strong>
+              Showing {results.length} of {total} repositor{total === 1 ? "y" : "ies"} for <strong>{analyzedUsername}</strong>
             </p>
             <div className="filter-bar">
               {(["all", "basic", "intermediate", "advanced", "na"] as const).map((f) => (
@@ -109,11 +149,23 @@ export default function App() {
               ))}
             </div>
           </div>
+
           <div className="grid">
             {filteredResults.map((r) => (
               <RepoCard key={r.repo_name} {...r} />
             ))}
           </div>
+
+          {/* Sentinel — IntersectionObserver watches this to trigger next page load */}
+          <div ref={sentinelRef} className="sentinel" />
+
+          {loading && (
+            <div className="status-text" style={{ textAlign: "center" }}>Loading more…</div>
+          )}
+
+          {!hasMore && !loading && (
+            <div className="status-text" style={{ textAlign: "center" }}>All {total} repositories loaded.</div>
+          )}
         </>
       )}
     </div>

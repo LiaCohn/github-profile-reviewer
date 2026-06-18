@@ -2,10 +2,10 @@ import asyncio
 import os
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from github import fetch_readme, fetch_repos
+from github import fetch_readme, fetch_repos_page
 from analyzer import analyze_readme, configure
 
 load_dotenv()
@@ -27,16 +27,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+sem = asyncio.Semaphore(5)
 
-sem = asyncio.Semaphore(5) #limit the number of concurrent requests to 5
 
-
-@app.post("/analyze")
-async def analyze(username: str = Query(..., min_length=1)):
-    repos = await fetch_repos(username, GITHUB_TOKEN)
+@app.get("/analyze")
+async def analyze(
+    username: str = Query(..., min_length=1),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(10, ge=1, le=100),
+):
+    repos, total = await fetch_repos_page(username, page, per_page, GITHUB_TOKEN)
 
     if not repos:
-        return []
+        return {"results": [], "total": total, "page": page, "per_page": per_page}
 
     async def process(repo: dict) -> dict:
         async with sem:
@@ -51,4 +54,4 @@ async def analyze(username: str = Query(..., min_length=1)):
         }
 
     results = await asyncio.gather(*[process(r) for r in repos])
-    return list(results)
+    return {"results": list(results), "total": total, "page": page, "per_page": per_page}
