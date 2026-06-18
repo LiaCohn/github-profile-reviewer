@@ -1,7 +1,15 @@
 import json
+import logging
+import random
 import re
 import asyncio
 from groq import Groq, RateLimitError
+
+logger = logging.getLogger(__name__)
+
+GROQ_MODEL = "llama-3.3-70b-versatile"
+MAX_RETRIES = 3
+RETRY_BASE_SECONDS = 5
 
 _FALLBACK = {"level": "NA", "summary": "Could not parse analysis."}
 _NO_README = {"level": "NA", "summary": "This repository has no README."}
@@ -29,12 +37,11 @@ async def analyze_readme(readme: str | None) -> dict:
         f"README:\n{readme}"
     )
 
-    max_retries = 3
-    for attempt in range(max_retries):
+    for attempt in range(MAX_RETRIES):
         try:
             response = await asyncio.to_thread(
                 _client.chat.completions.create,
-                model="llama-3.3-70b-versatile",
+                model=GROQ_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
             )
@@ -52,14 +59,17 @@ async def analyze_readme(readme: str | None) -> dict:
             return parsed
 
         except RateLimitError as e:
-            if attempt < max_retries - 1:
-                wait = 5 * (attempt + 1)  # 5s, 10s, 15s
-                print(f"Rate limited, retrying in {wait}s... (attempt {attempt + 1}/{max_retries})")
+            if attempt < MAX_RETRIES - 1:
+                wait = RETRY_BASE_SECONDS * (attempt + 1) + random.uniform(0, 2)
+                logger.warning(
+                    "Groq rate limited, retrying in %.1fs (attempt %d/%d)",
+                    wait, attempt + 1, MAX_RETRIES,
+                )
                 await asyncio.sleep(wait)
             else:
-                print("analyze_readme error (rate limit, giving up):", e)
+                logger.error("Groq rate limit reached, giving up: %s", e)
                 return _FALLBACK
 
         except Exception as e:
-            print("analyze_readme error:", e)
+            logger.error("analyze_readme failed: %s", e)
             return _FALLBACK
