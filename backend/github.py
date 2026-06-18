@@ -4,53 +4,53 @@ from fastapi import HTTPException
 
 GITHUB_API = "https://api.github.com"
 
-
 def _headers(token: str | None) -> dict:
     h = {"Accept": "application/vnd.github+json"}
     if token:
         h["Authorization"] = f"Bearer {token}"
     return h
 
-
-async def fetch_all_repos(username: str, token: str | None = None) -> list[dict]:
-    """Fetch every public repo for a user, paginating through GitHub's 100-per-page limit."""
-    repos: list[dict] = []
-    page = 1
+async def fetch_user_public_repo_count(username: str, token: str | None = None) -> int:
+    """Fetch the total number of public repositories for a specific user"""
+    url = f"{GITHUB_API}/users/{username}"
     async with httpx.AsyncClient(timeout=15) as client:
-        while True:
-            url = f"{GITHUB_API}/users/{username}/repos?per_page=100&type=public&page={page}"
-            resp = await client.get(url, headers=_headers(token))
-
-            if page == 1 and resp.status_code == 404:
-                raise HTTPException(status_code=404, detail=f"GitHub user '{username}' not found.")
-            if resp.status_code in (403, 429):
-                raise HTTPException(status_code=429, detail="GitHub API rate limit exceeded.")
-            if resp.status_code != 200:
-                raise HTTPException(status_code=502, detail="GitHub API error.")
-
-            batch = resp.json()
-            if not batch:
-                break
-            repos.extend(batch)
-            if len(batch) < 100:
-                break
-            page += 1
-
-    return repos
-
+        resp = await client.get(url, headers=_headers(token))
+        
+        if resp.status_code == 404:
+            raise HTTPException(status_code=404, detail=f"GitHub user '{username}' not found.")
+        if resp.status_code in (403, 429):
+            raise HTTPException(status_code=429, detail="GitHub API rate limit exceeded.")
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail="GitHub API error.")
+            
+        data = resp.json()
+        return data.get("public_repos", 0)
 
 async def fetch_repos_page(
     username: str,
     page: int,
     per_page: int,
     token: str | None = None,
-) -> tuple[list[dict], int]:
-    """Fetch a single page slice of repos. Returns (repos_slice, total_count)."""
-    all_repos = await fetch_all_repos(username, token)
-    total = len(all_repos)
-    start = (page - 1) * per_page
-    return all_repos[start : start + per_page], total
+) -> list[dict]:
+    """Fetch a specific page of public repositories for a user, along with the total number of public repositories"""
+    # total = await fetch_user_public_repo_count(username, token)
+    
+    # if total == 0:
+    #     return [], 0
 
+    # Fetch the specific page of public repositories for the user
+    url = f"{GITHUB_API}/users/{username}/repos?per_page={per_page}&type=public&page={page}"
+    
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.get(url, headers=_headers(token))
+        
+        if resp.status_code in (403, 429):
+            raise HTTPException(status_code=429, detail="GitHub API rate limit exceeded.")
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail="GitHub API error.")
+            
+        repos_slice = resp.json()
+        return repos_slice
 
 async def fetch_readme(owner: str, repo: str, token: str | None = None) -> str | None:
     url = f"{GITHUB_API}/repos/{owner}/{repo}/readme"

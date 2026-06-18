@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from github import fetch_readme, fetch_repos_page
+from github import fetch_readme, fetch_repos_page, fetch_user_public_repo_count
 from analyzer import analyze_readme, configure
 
 load_dotenv()
@@ -29,6 +29,12 @@ app.add_middleware(
 
 sem = asyncio.Semaphore(5)
 
+@app.get("/user-public-repo-count")
+async def user_public_repo_count(
+    username: str = Query(..., min_length=1),
+):
+    return await fetch_user_public_repo_count(username, GITHUB_TOKEN)
+
 
 @app.get("/analyze")
 async def analyze(
@@ -36,10 +42,10 @@ async def analyze(
     page: int = Query(1, ge=1),
     per_page: int = Query(10, ge=1, le=100),
 ):
-    repos, total = await fetch_repos_page(username, page, per_page, GITHUB_TOKEN)
+    repos = await fetch_repos_page(username, page, per_page, GITHUB_TOKEN)
 
     if not repos:
-        return {"results": [], "total": total, "page": page, "per_page": per_page}
+        return {"results": [], "page": page, "per_page": per_page}
 
     async def process(repo: dict) -> dict:
         async with sem:
@@ -54,4 +60,4 @@ async def analyze(
         }
 
     results = await asyncio.gather(*[process(r) for r in repos])
-    return {"results": list(results), "total": total, "page": page, "per_page": per_page}
+    return {"results": list(results), "page": page, "per_page": per_page}

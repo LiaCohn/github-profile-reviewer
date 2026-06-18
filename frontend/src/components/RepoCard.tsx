@@ -1,12 +1,7 @@
 import "./RepoCard.css";
+import { RepoResult } from "../services/api";
 
-interface RepoCardProps {
-  repo_name: string;
-  repo_url: string;
-  level: "Basic" | "Intermediate" | "Advanced" | "NA";
-  summary: string;
-  has_readme: boolean;
-}
+type RepoCardProps = RepoResult;
 
 const LEVEL_COLORS: Record<string, string> = {
   Basic: "#22c55e",

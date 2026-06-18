@@ -1,21 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import axios from "axios";
 import RepoCard from "./components/RepoCard";
+import { repoService, RepoResult } from "./services/api";
 import "./App.css";
-
-interface RepoResult {
-  repo_name: string;
-  repo_url: string;
-  level: "Basic" | "Intermediate" | "Advanced" | "NA";
-  summary: string;
-  has_readme: boolean;
-}
-
-interface AnalyzeResponse {
-  results: RepoResult[];
-  total: number;
-  page: number;
-  per_page: number;
-}
 
 const PER_PAGE = 10;
 
@@ -32,36 +19,37 @@ export default function App() {
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
+  // Client-side filtering based on selected complexity level
   const filteredResults = results.filter((r) =>
     filterComplexity === "all" || r.level.toLowerCase() === filterComplexity
   );
 
-  const fetchPage = useCallback(async (user: string, pageNum: number) => {
+  // Fetches a specific page batch of repositories and analyzes them
+  const fetchPage = useCallback(async (user: string, pageNum: number, currentTotal?: number) => {
     setLoading(true);
     try {
-      const resp = await fetch(
-        `/analyze?username=${encodeURIComponent(user)}&page=${pageNum}&per_page=${PER_PAGE}`
-      );
+      const reposBatch = await repoService.getAnalyzedRepos(user, pageNum, PER_PAGE);
 
-      if (!resp.ok) {
-        const data = await resp.json().catch(() => ({}));
-        setError(data.detail ?? `Error ${resp.status}`);
-        return;
+      // Clear list on page 1 for a new search, otherwise append results to the end
+      setResults((prev) => (pageNum === 1 ? reposBatch : [...prev, ...reposBatch]));
+      setPage(pageNum);
+
+      // Determine if there are more repositories left to load
+      // Use the newly fetched total for page 1, fallback to existing state for subsequent pages
+      const effectiveTotal = currentTotal !== undefined ? currentTotal : total;
+      setHasMore((pageNum * PER_PAGE) < effectiveTotal);
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.detail ?? `Error ${err.response?.status}`);
+      } else {
+        setError("Could not reach the server. Is the backend running?");
       }
-
-      const data: AnalyzeResponse = await resp.json();
-
-      setResults((prev) => (pageNum === 1 ? data.results : [...prev, ...data.results]));
-      setTotal(data.total);
-      setPage(data.page);
-      setHasMore((data.page * data.per_page) < data.total);
-    } catch {
-      setError("Could not reach the server. Is the backend running?");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [total]);
 
+  // Main trigger function when user clicks the Analyze button
   async function handleAnalyze() {
     const trimmed = username.trim();
     if (!trimmed) return;
@@ -70,10 +58,32 @@ export default function App() {
     setFilterComplexity("all");
     setError(null);
     setResults([]);
-    setTotal(0);
+    setTotal(0); // Critical reset so old counts don't linger in the UI during loading
     setHasMore(false);
+    setLoading(true);
 
-    await fetchPage(trimmed, 1);
+    try {
+      // Step 1: Call the dedicated endpoint to fetch the total repo count exactly once
+      const totalCount = await repoService.getRepoCount(trimmed);
+      setTotal(totalCount);
+
+      // Stop execution early if the user exists but has 0 public repositories
+      if (totalCount === 0) {
+        setHasMore(false);
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Trigger the first page load and feed it the fresh total count
+      await fetchPage(trimmed, 1, totalCount);
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.detail ?? "Failed to fetch repository count.");
+      } else {
+        setError("Could not reach the server. Is the backend running?");
+      }
+      setLoading(false);
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
