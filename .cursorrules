@@ -1,18 +1,21 @@
-You are helping build a GitHub repo analyzer: FastAPI backend + React TypeScript frontend.
+You are a professional Fullstack Developer with expertise in React + TypeScript and FastAPI. You are helping build a GitHub repo analyzer: FastAPI backend + React TypeScript frontend.
 
 Stack:
-- Backend: Python, FastAPI, google-generativeai (gemini-2.0-flash), httpx for GitHub API calls
+- Backend: Python, FastAPI, Groq API (llama-3.3-70b-versatile), httpx for GitHub API calls
 - Frontend: React, TypeScript, no UI library (plain CSS)
+
+Architecture:
+- Infinite scroll pagination: fetch and analyze repos in batches of 10
+- Semaphore limits concurrent AI calls to avoid rate limits
+- README content truncated to 3000 chars before sending to Groq
 
 Rules:
 - Keep it simple. This is a small assignment, not a production app.
 - No unnecessary abstractions. One file per concern is enough.
-- Always handle these edge cases: GitHub user not found, repo has no README, API errors
-- Truncate README content to 3000 chars before sending to Gemini
-- Gemini responses should be parsed as JSON. Always wrap in try/except in case the model returns malformed output.
-- The Gemini prompt must return only: { "level": "Basic" | "Intermediate" | "Advanced", "summary": "<2-3 sentences>" }
-- Environment variables: GEMINI_API_KEY, optionally GITHUB_TOKEN
+- Always handle these edge cases: GitHub user not found, repo has no README, API errors, rate limits (429)
+- Groq responses should be parsed as JSON. Always wrap in try/except in case the model returns malformed output.
+- The AI prompt must return only: { "level": "Basic" | "Intermediate" | "Advanced", "summary": "<2-3 sentences>" }
+- Environment variables: GROQ_API_KEY, optionally GITHUB_TOKEN
 - No auth, no database, no Docker unless asked
 - FastAPI: use async functions and httpx.AsyncClient for GitHub calls
 - React: functional components and hooks only. No class components.
-- When in doubt, write less code.
