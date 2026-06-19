@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import axios from "axios";
 import RepoCard from "./components/RepoCard";
 import { repoService, RepoResult } from "./services/api";
 import "./App.css";
@@ -15,14 +14,8 @@ export default function App() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [filterComplexity, setFilterComplexity] = useState<"all" | "basic" | "intermediate" | "advanced" | "na">("all");
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-
-  // Client-side filtering based on selected complexity level
-  const filteredResults = results.filter((r) =>
-    filterComplexity === "all" || r.level.toLowerCase() === filterComplexity
-  );
 
   // Fetches a specific page batch of repositories and analyzes them
   const fetchPage = useCallback(async (user: string, pageNum: number, currentTotal?: number) => {
@@ -39,23 +32,17 @@ export default function App() {
       const effectiveTotal = currentTotal !== undefined ? currentTotal : total;
       setHasMore((pageNum * PER_PAGE) < effectiveTotal);
     } catch (err) {
-      if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.detail ?? `Error ${err.response?.status}`);
-      } else {
-        setError("Could not reach the server. Is the backend running?");
-      }
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
   }, [total]);
 
-  // Main trigger function when user clicks the Analyze button
-  async function handleAnalyze() {
+  const handleAnalyze = useCallback(async () => {
     const trimmed = username.trim();
     if (!trimmed) return;
 
     setAnalyzedUsername(trimmed);
-    setFilterComplexity("all");
     setError(null);
     setResults([]);
     setTotal(0); // Critical reset so old counts don't linger in the UI during loading
@@ -77,18 +64,14 @@ export default function App() {
       // Step 2: Trigger the first page load and feed it the fresh total count
       await fetchPage(trimmed, 1, totalCount);
     } catch (err) {
-      if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.detail ?? "Failed to fetch repository count.");
-      } else {
-        setError("Could not reach the server. Is the backend running?");
-      }
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
       setLoading(false);
     }
-  }
+  }, [fetchPage, username]);
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") handleAnalyze();
-  }
+  }, [handleAnalyze]);
 
   // IntersectionObserver — fires when the sentinel div scrolls into view
   useEffect(() => {
@@ -143,25 +126,12 @@ export default function App() {
 
       {results.length > 0 && (
         <>
-          <div className="results-header">
-            <p className="result-count">
-              Showing {results.length} of {total} repositor{total === 1 ? "y" : "ies"} for <strong>{analyzedUsername}</strong>
-            </p>
-            <div className="filter-bar">
-              {(["all", "basic", "intermediate", "advanced", "na"] as const).map((f) => (
-                <button
-                  key={f}
-                  className={`filter-btn${filterComplexity === f ? " active" : ""}`}
-                  onClick={() => setFilterComplexity(f)}
-                >
-                  {f.charAt(0).toUpperCase() + f.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
+          <p className="result-count">
+            Showing {results.length} of {total} repositor{total === 1 ? "y" : "ies"} for <strong>{analyzedUsername}</strong>
+          </p>
 
           <div className="grid">
-            {filteredResults.map((r) => (
+            {results.map((r) => (
               <RepoCard key={r.repo_name} {...r} />
             ))}
           </div>
@@ -170,11 +140,11 @@ export default function App() {
           <div ref={sentinelRef} className="sentinel" />
 
           {loading && (
-            <div className="status-text" style={{ textAlign: "center" }}>Loading more…</div>
+            <div className="status-text status-text--center">Loading more…</div>
           )}
 
           {!hasMore && !loading && (
-            <div className="status-text" style={{ textAlign: "center" }}>All {total} repositories loaded.</div>
+            <div className="status-text status-text--center">All {total} repositories loaded.</div>
           )}
         </>
       )}

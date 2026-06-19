@@ -9,23 +9,36 @@ export interface RepoResult {
 }
 
 const api = axios.create({
-  baseURL: "http://localhost:8000",
+  baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:8000",
 });
 
+function resolveErrorMessage(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) {
+    return err.response?.data?.detail ?? `Error ${err.response?.status}`;
+  }
+  return fallback;
+}
+
 export const repoService = {
-  // Fetch total number of public repos for a GitHub user
   async getRepoCount(username: string): Promise<number> {
-    const { data } = await api.get<number>(
-      `/user-public-repo-count?username=${encodeURIComponent(username)}`
-    );
-    return data;
+    try {
+      const { data } = await api.get<number>("/user-public-repo-count", {
+        params: { username },
+      });
+      return data;
+    } catch (err) {
+      throw new Error(resolveErrorMessage(err, "Failed to fetch repository count."));
+    }
   },
 
-  // Fetch and analyze a single page of repos
   async getAnalyzedRepos(username: string, page: number, perPage: number): Promise<RepoResult[]> {
-    const { data } = await api.get<{ results: RepoResult[] }>(
-      `/analyze?username=${encodeURIComponent(username)}&page=${page}&per_page=${perPage}`
-    );
-    return data.results;
+    try {
+      const { data } = await api.get<RepoResult[]>("/analyze", {
+        params: { username, page, per_page: perPage },
+      });
+      return data;
+    } catch (err) {
+      throw new Error(resolveErrorMessage(err, "Could not reach the server. Is the backend running?"));
+    }
   },
 };
