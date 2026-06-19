@@ -83,7 +83,9 @@ export default function App() {
           fetchPage(analyzedUsername, page + 1);
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.0,
+        rootMargin: "300px"
+      }
     );
 
     observer.observe(sentinelRef.current);
