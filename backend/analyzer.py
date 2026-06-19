@@ -30,19 +30,36 @@ async def analyze_readme(readme: str | None) -> dict:
     if not readme:
         return _NO_README
 
-    prompt = (
-        'Analyze this README and return ONLY a JSON object with no extra text:\n'
-        '{"level": "Basic" | "Intermediate" | "Advanced", '
-        '"summary": "<2-3 sentences: what the project does, its complexity, and the experience level required>"}\n\n'
-        f"README:\n{readme}"
-    )
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You analyze GitHub READMEs and assess the project's complexity. "
+                "Always respond with only a valid JSON object — no markdown, no explanation, no extra text."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                "Analyze this README and return a JSON object with exactly these two fields:\n"
+                '- "level": one of "Basic", "Intermediate", or "Advanced" using this rubric:\n'
+                "  Basic: single language or framework, no external APIs or databases, straightforward logic\n"
+                "  Intermediate: multiple integrated services, REST APIs, database, some async or auth\n"
+                "  Advanced: distributed systems, ML/AI, complex algorithms, or significant infrastructure\n"
+                '- "summary": exactly 2 short sentences. '
+                "First: what the project does and its tech stack. "
+                "Second: its complexity and the experience level required.\n\n"
+                f"README:\n{readme}"
+            ),
+        },
+    ]
 
     for attempt in range(MAX_RETRIES):
         try:
             response = await asyncio.to_thread(
                 _client.chat.completions.create,
                 model=GROQ_MODEL,
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 temperature=0.3,
             )
             text = response.choices[0].message.content.strip()
