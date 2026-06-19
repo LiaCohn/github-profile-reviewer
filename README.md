@@ -103,8 +103,6 @@ Returns a list of analyzed repositories for the requested page:
 ### Architecture
 The backend is a FastAPI async application using `httpx.AsyncClient` for all GitHub API calls. A single shared client is created at startup via a lifespan context manager and reused across requests for efficiency. The frontend is a React + TypeScript SPA using an Axios service layer (`src/services/api.ts`) to keep API logic separate from UI components.
 
-### AI Provider Switch
-The original plan used Gemini 2.0 Flash, but the free tier daily quota (`limit: 0`) was exhausted quickly during development. The project was switched to Groq (Llama 3.3 70B), which has a more practical free tier for development use.
 
 ### Rate Limit Handling
 The main challenge was Groq's free tier: 30 requests/minute and 12,000 tokens/minute. Analyzing a user with many repos fires multiple simultaneous AI calls which instantly hit the limit. This was addressed in layers:
@@ -129,7 +127,10 @@ Pagination was implemented using the browser's `IntersectionObserver` API. A sen
 
 ## Future Improvements
 
-- **Streaming results** — use Server-Sent Events to stream each repo's analysis back to the frontend as it completes, so cards appear one by one instead of waiting for the full batch. On the backend, FastAPI's `StreamingResponse` with an async generator would yield each result as soon as it's ready, eliminating the need to wait for the full `asyncio.gather` to resolve. 
+- **Streaming Results with Async Generators (SSE)** — An alternative approach considered was using **Python Async Generators** and **Server-Sent Events (SSE)**. 
+  * *How it works:* The backend would use an async generator with the `yield` keyword to process and yield repositories one-by-one, instantly pushing each analyzed card to the client in real-time via a single open connection (`EventSource`), rather than waiting for the full `asyncio.gather` batch to complete.
+  * *Why Pagination was preferred for this phase:* Pagination provides better **Cost & Rate-Limit Optimization**; if a user has 100 repos but finds what they need in the first 10, we avoid firing the remaining 90 expensive AI calls, respecting token limits. It also integrates flawlessly with our backend `asyncio.Semaphore(5)` to safely throttle request spikes.
 - **Result caching** — cache analysis results per username/repo so repeat lookups don't re-call the AI API
 - **Fork filtering** — optionally skip forked repositories since they rarely have original READMEs worth analyzing
 - **Sort options** — allow sorting results by level, name, or last updated date
+
