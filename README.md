@@ -4,18 +4,6 @@ Analyze any GitHub user's public repositories using Groq (Llama 3.3 70B). Each r
 
 ![Architecture Diagram](architecture_diagram.png)
 
-## Assumptions & Limitations
-
-- **Repos sorted by last updated** — the most recently active repositories appear first.
-- **README truncation** — README content is truncated to 3,000 characters before being sent to the AI to keep costs and latency low.
-- **Public repos only** — private repositories are never fetched or analyzed.
-- **No caching** — every analysis request hits the GitHub and Groq APIs fresh. Re-analyzing the same user makes new API calls.
-- **NA for missing READMEs** — repos without a README cannot be assessed and receive an NA badge.
-- **README-based assessment only** — the AI assesses complexity based solely on README content, not the actual code. Projects with sparse or missing READMEs may be rated lower than their true complexity warrants.
-- **Rate limits** — the free Groq tier allows ~30 requests/minute. The backend retries rate-limited calls up to 3 times with increasing delays before falling back to NA.
-- **Concurrency limited** — at most 5 repositories are analyzed simultaneously per request (via a semaphore) to avoid overwhelming the Groq API and protect the free tier key.
-- **Paginated loading** — only 10 repos are analyzed per scroll page, further reducing burst API usage and protecting the free Groq key from exhaustion on large accounts.
-
 ## Setup
 
 ### Backend
@@ -127,6 +115,18 @@ The main challenge was Groq's free tier: 30 requests/minute and 12,000 tokens/mi
 
 ### Infinite Scroll
 Pagination was implemented using the browser's `IntersectionObserver` API. A sentinel element is placed at the bottom of the results grid with a `rootMargin` of 300px, triggering the next page fetch before the user reaches the bottom — ensuring a seamless experience with no visible loading gap. The total repo count is fetched once upfront via a dedicated `/user-public-repo-count` endpoint (using GitHub's user profile API) to avoid over-fetching.
+
+## Assumptions & Limitations
+
+- **Repos sorted by last updated** — the most recently active repositories appear first.
+- **README truncation** — README content is truncated to 3,000 characters before being sent to the AI to keep costs and latency low.
+- **Public repos only** — private repositories are never fetched or analyzed.
+- **No caching** — every analysis request hits the GitHub and Groq APIs fresh. Re-analyzing the same user makes new API calls.
+- **NA for missing READMEs** — repos without a README cannot be assessed and receive an NA badge.
+- **README-based assessment only** — the AI assesses complexity based solely on README content, not the actual code. Projects with sparse or missing READMEs may be rated lower than their true complexity warrants.
+- **Rate limits** — the free Groq tier allows ~30 requests/minute. The backend retries rate-limited calls up to 3 times with increasing delays before falling back to NA.
+- **Concurrency limited** — at most 5 repositories are analyzed simultaneously per request (via a semaphore) to avoid overwhelming the Groq API and protect the free tier key.
+- **Paginated loading** — only 10 repos are analyzed per scroll page, further reducing burst API usage and protecting the free Groq key from exhaustion on large accounts.
 
 ## Future Improvements
 
