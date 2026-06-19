@@ -14,14 +14,8 @@ export default function App() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [filterComplexity, setFilterComplexity] = useState<"all" | "basic" | "intermediate" | "advanced" | "na">("all");
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-
-  // Client-side filtering based on selected complexity level
-  const filteredResults = results.filter((r) =>
-    filterComplexity === "all" || r.level.toLowerCase() === filterComplexity
-  );
 
   // Fetches a specific page batch of repositories and analyzes them
   const fetchPage = useCallback(async (user: string, pageNum: number, currentTotal?: number) => {
@@ -49,7 +43,6 @@ export default function App() {
     if (!trimmed) return;
 
     setAnalyzedUsername(trimmed);
-    setFilterComplexity("all");
     setError(null);
     setResults([]);
     setTotal(0); // Critical reset so old counts don't linger in the UI during loading
@@ -133,25 +126,12 @@ export default function App() {
 
       {results.length > 0 && (
         <>
-          <div className="results-header">
-            <p className="result-count">
-              Showing {results.length} of {total} repositor{total === 1 ? "y" : "ies"} for <strong>{analyzedUsername}</strong>
-            </p>
-            <div className="filter-bar">
-              {(["all", "basic", "intermediate", "advanced", "na"] as const).map((f) => (
-                <button
-                  key={f}
-                  className={`filter-btn${filterComplexity === f ? " active" : ""}`}
-                  onClick={() => setFilterComplexity(f)}
-                >
-                  {f.charAt(0).toUpperCase() + f.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
+          <p className="result-count">
+            Showing {results.length} of {total} repositor{total === 1 ? "y" : "ies"} for <strong>{analyzedUsername}</strong>
+          </p>
 
           <div className="grid">
-            {filteredResults.map((r) => (
+            {results.map((r) => (
               <RepoCard key={r.repo_name} {...r} />
             ))}
           </div>
