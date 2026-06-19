@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import axios from "axios";
 import RepoCard from "./components/RepoCard";
 import { repoService, RepoResult } from "./services/api";
 import "./App.css";
@@ -39,18 +38,13 @@ export default function App() {
       const effectiveTotal = currentTotal !== undefined ? currentTotal : total;
       setHasMore((pageNum * PER_PAGE) < effectiveTotal);
     } catch (err) {
-      if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.detail ?? `Error ${err.response?.status}`);
-      } else {
-        setError("Could not reach the server. Is the backend running?");
-      }
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
   }, [total]);
 
-  // Main trigger function when user clicks the Analyze button
-  async function handleAnalyze() {
+  const handleAnalyze = useCallback(async () => {
     const trimmed = username.trim();
     if (!trimmed) return;
 
@@ -77,18 +71,14 @@ export default function App() {
       // Step 2: Trigger the first page load and feed it the fresh total count
       await fetchPage(trimmed, 1, totalCount);
     } catch (err) {
-      if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.detail ?? "Failed to fetch repository count.");
-      } else {
-        setError("Could not reach the server. Is the backend running?");
-      }
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
       setLoading(false);
     }
-  }
+  }, [fetchPage, username]);
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") handleAnalyze();
-  }
+  }, [handleAnalyze]);
 
   // IntersectionObserver — fires when the sentinel div scrolls into view
   useEffect(() => {
@@ -170,11 +160,11 @@ export default function App() {
           <div ref={sentinelRef} className="sentinel" />
 
           {loading && (
-            <div className="status-text" style={{ textAlign: "center" }}>Loading more…</div>
+            <div className="status-text status-text--center">Loading more…</div>
           )}
 
           {!hasMore && !loading && (
-            <div className="status-text" style={{ textAlign: "center" }}>All {total} repositories loaded.</div>
+            <div className="status-text status-text--center">All {total} repositories loaded.</div>
           )}
         </>
       )}

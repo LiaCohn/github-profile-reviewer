@@ -64,6 +64,10 @@
   font-size: 14px;
 }
 
+.status-text--center {
+  text-align: center;
+}
+
 .error-box {
   background: #1f0a0a;
   border: 1px solid #6e2020;
