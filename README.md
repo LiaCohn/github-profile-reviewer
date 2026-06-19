@@ -53,7 +53,6 @@ The app will be available at `http://localhost:5173`.
 2. Enter a GitHub username and click **Analyze**.
 3. The first 10 repositories are fetched and analyzed immediately.
 4. Scroll down to automatically load the next batch of 10.
-5. Use the filter buttons to narrow results by level.
 
 ## Levels
 
