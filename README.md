@@ -125,11 +125,22 @@ Pagination was implemented using the browser's `IntersectionObserver` API. A sen
 - **Concurrency limited** — at most 5 repositories are analyzed simultaneously per request (via a semaphore) to avoid overwhelming the Groq API and protect the free tier key.
 - **Paginated loading** — only 10 repos are analyzed per scroll page, further reducing burst API usage and protecting the free Groq key from exhaustion on large accounts.
 
+## AI Tools Used
+
+This project was built with the assistance of **Cursor AI** (Claude Sonnet 4.5).
+
+A `.cursorrules` file was set up at the start of the project to give the AI persistent context about the stack, constraints, and edge cases — so it didn't need to be re-briefed on every interaction.
+
+Cursor's different modes were used intentionally throughout:
+- **Plan mode** — to review and confirm the architecture before any code was written
+- **Agent mode** — for implementing features, refactoring, and file edits
+- **Ask mode** — for understanding why things work the way they do, debugging errors, and getting explanations before deciding on an approach
+
+The AI was used as a collaborator rather than an autopilot — outputs were reviewed, mistakes were caught, and decisions about architecture (pagination vs. streaming, Gemini vs. Groq, semaphore design) were made by the developer with AI input.
+
 ## Future Improvements
 
-- **Streaming Results with Async Generators (SSE)** — An alternative approach considered was using **Python Async Generators** and **Server-Sent Events (SSE)**. 
-  * *How it works:* The backend would use an async generator with the `yield` keyword to process and yield repositories one-by-one, instantly pushing each analyzed card to the client in real-time via a single open connection (`EventSource`), rather than waiting for the full `asyncio.gather` batch to complete.
-  * *Why Pagination was preferred for this phase:* Pagination provides better **Cost & Rate-Limit Optimization**; if a user has 100 repos but finds what they need in the first 10, we avoid firing the remaining 90 expensive AI calls, respecting token limits. It also integrates flawlessly with our backend `asyncio.Semaphore(5)` to safely throttle request spikes.
+- **Streaming results (SSE + async generators)** — use FastAPI's `StreamingResponse` with a Python async generator to push each analyzed repo to the frontend via Server-Sent Events as it completes, rather than waiting for the full batch
 - **Result caching** — cache analysis results per username/repo so repeat lookups don't re-call the AI API
 - **Fork filtering** — optionally skip forked repositories since they rarely have original READMEs worth analyzing
 - **Sort options** — allow sorting results by level, name, or last updated date
