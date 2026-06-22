@@ -18,7 +18,7 @@ pip install -r requirements.txt
 Create a `.env` file in the project root with your API keys:
 ```
 GROQ_API_KEY=your_groq_key_here
-GITHUB_TOKEN=your_github_token_here  # optional, raises GitHub rate limit from 60 to 5000 req/hr
+GITHUB_TOKEN=your_github_token_here  # required — raises GitHub rate limit from 60 to 5000 req/hr
 CORS_ORIGIN=http://localhost:5173     # optional, defaults to http://localhost:5173
 ```
 

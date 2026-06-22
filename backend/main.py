@@ -17,11 +17,13 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 CORS_ORIGIN = os.getenv("CORS_ORIGIN", "http://localhost:5173")
 
 if not GROQ_API_KEY:
     raise RuntimeError("GROQ_API_KEY environment variable is not set.")
+if not GITHUB_TOKEN:
+    raise RuntimeError("GITHUB_TOKEN environment variable is not set.")
 
 
 # --- Pydantic models ---
