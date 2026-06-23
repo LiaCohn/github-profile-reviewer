@@ -140,7 +140,6 @@ The AI was used as a collaborator rather than an autopilot — outputs were revi
 
 ## Future Improvements
 
-- **Streaming results (SSE + async generators)** — use FastAPI's `StreamingResponse` with a Python async generator to push each analyzed repo to the frontend via Server-Sent Events as it completes, rather than waiting for the full batch
 - **Result caching** — cache analysis results per username/repo so repeat lookups don't re-call the AI API
 - **Fork filtering** — optionally skip forked repositories since they rarely have original READMEs worth analyzing
 - **Sort options** — allow sorting results by level, name, or last updated date
